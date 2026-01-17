@@ -84,8 +84,7 @@ Options:
   -w, --workdir PATH       Set working directory inside container (default: /workspace)
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
   -d, --detach             Run container in background
-  --dind                   Enable Docker-in-Docker mode (isolated Docker daemon)
-  --no-docker              Don't mount Docker socket
+  --insecure               Expose host Docker socket and PID namespace (less isolated)
   --no-creds               Don't mount Claude credentials
   -n, --name NAME          Set container name
   -h, --help               Show help message
@@ -131,30 +130,31 @@ Options:
 
 ### Docker-in-Docker
 
-The sandbox supports two Docker modes:
+The sandbox runs an isolated Docker daemon by default:
 
-**Default mode** - mounts the host's Docker socket:
 ```bash
 ./claude-sandbox.sh -m .:/workspace
-
-# Inside the container - containers run on HOST
-docker ps
-docker build -t myimage .
-```
-
-**Dind mode** - runs an isolated Docker daemon inside the sandbox:
-```bash
-./claude-sandbox.sh --dind -m .:/workspace
 
 # Inside the container - containers run INSIDE the sandbox
 docker run -p 8080:80 nginx
 curl localhost:8080  # Works! Port is accessible within sandbox
 ```
 
-Use `--dind` when:
-- You need to access ports exposed by containers you create
-- You want complete isolation from host Docker
-- You're running services that need to communicate via localhost
+This provides:
+- Full isolation from host Docker environment
+- Containers accessible via localhost
+- No host PID namespace exposure
+
+**Insecure mode** - exposes host Docker socket:
+```bash
+./claude-sandbox.sh --insecure -m .:/workspace
+
+# Inside the container - containers run on HOST
+docker ps  # Shows host containers
+# Ports NOT accessible via localhost inside sandbox
+```
+
+Use `--insecure` only when you specifically need host Docker access.
 
 ## Claude Credentials
 
@@ -299,15 +299,15 @@ The first run builds the image which takes several minutes. Subsequent runs star
 
 ## Security Notes
 
-1. **Docker Socket**: Mounting the Docker socket gives container access to host Docker. Use `--no-docker` if not needed, or use `--dind` for an isolated Docker daemon.
+1. **Isolated by Default**: The sandbox runs an isolated Docker daemon (dind) by default. Host Docker socket and PID namespace are NOT exposed unless you use `--insecure`.
 
-2. **Docker-in-Docker**: The `--dind` mode runs a separate Docker daemon inside the container. This provides isolation but requires privileged mode. Containers created in dind mode are fully isolated from the host.
+2. **Insecure Mode**: Using `--insecure` exposes the host Docker socket and PID namespace. Only use this when you specifically need host Docker access.
 
-3. **Credentials**: Claude credentials are mounted read-only. The container cannot modify your host credentials.
+3. **Credentials**: Claude credentials are mounted with bindfs for permission handling. The container can read and write to credential files.
 
 4. **Network**: The container has full network access. Use `--network none` to disable if needed.
 
-5. **Root User**: The container runs as root. For production use, consider creating a non-root user.
+5. **Privileged Mode**: The container runs in privileged mode (required for dind). This grants elevated capabilities inside the container.
 
 ## License
 

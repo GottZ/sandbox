@@ -36,8 +36,8 @@ NC='\033[0m' # No Color
 WORKDIR="/workspace"
 INTERACTIVE=true
 MOUNTS=()
-DOCKER_SOCKET=true
-DIND_MODE=false
+DIND_MODE=true      # Default: isolated Docker daemon
+INSECURE_MODE=false # When true: expose host Docker socket and PID namespace
 CLAUDE_CREDS=true
 EXTRA_ARGS=()
 INITIAL_PROMPT=""
@@ -56,8 +56,7 @@ ${GREEN}Options:${NC}
                            Default: current directory mounted to /workspace
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
-  --dind                   Enable Docker-in-Docker mode (isolated Docker daemon)
-  --no-docker              Don't mount Docker socket (ignored if --dind is set)
+  --insecure               Expose host Docker socket and PID namespace (less isolated)
   --no-creds               Don't mount Claude credentials
   -n, --name NAME          Set container name (default: auto-generated)
   -h, --help               Show this help message
@@ -93,14 +92,17 @@ ${GREEN}Claude Configuration:${NC}
   Note: Container runs as non-root 'claude' user with passwordless sudo.
 
 ${GREEN}Docker Support:${NC}
-  By default, the host Docker socket is mounted at /var/run/docker.sock
-  This allows running Docker commands inside the container.
-
-  Use --dind for Docker-in-Docker mode:
-    - Runs an isolated Docker daemon inside the sandbox
+  By default, the sandbox runs an isolated Docker daemon (dind mode):
     - Containers created are fully accessible via localhost
     - Ports exposed by containers work correctly within the sandbox
-    - Useful when sandbox needs to interact with containers it creates
+    - Host Docker environment is not exposed
+    - Host PID namespace is isolated
+
+  Use --insecure to expose host Docker instead:
+    - Mounts host Docker socket at /var/run/docker.sock
+    - Exposes host PID namespace
+    - Containers run on the host (ports not accessible via localhost)
+    - Use only when you need direct host Docker access
 
 ${GREEN}Permissions:${NC}
   The container runs with full privileges to allow Claude unrestricted operation:
@@ -156,13 +158,9 @@ while [[ $# -gt 0 ]]; do
             INTERACTIVE=false
             shift
             ;;
-        --dind)
-            DIND_MODE=true
-            DOCKER_SOCKET=false
-            shift
-            ;;
-        --no-docker)
-            DOCKER_SOCKET=false
+        --insecure)
+            INSECURE_MODE=true
+            DIND_MODE=false
             shift
             ;;
         --no-creds)
@@ -221,13 +219,19 @@ fi
 # Container name
 DOCKER_CMD+=(--name "$CONTAINER_NAME")
 
-# Grant all permissions for unrestricted Claude operation
-log_info "Enabling privileged mode with all capabilities"
-DOCKER_CMD+=(--privileged)
-DOCKER_CMD+=(--cap-add=ALL)
-DOCKER_CMD+=(--security-opt seccomp=unconfined)
-DOCKER_CMD+=(--security-opt apparmor=unconfined)
-DOCKER_CMD+=(--pid=host)
+# Grant permissions based on mode
+if [ "$INSECURE_MODE" = true ]; then
+    log_warn "Running in INSECURE mode (host Docker and PID namespace exposed)"
+    DOCKER_CMD+=(--privileged)
+    DOCKER_CMD+=(--cap-add=ALL)
+    DOCKER_CMD+=(--security-opt seccomp=unconfined)
+    DOCKER_CMD+=(--security-opt apparmor=unconfined)
+    DOCKER_CMD+=(--pid=host)
+else
+    log_info "Running in isolated mode (dind)"
+    DOCKER_CMD+=(--privileged)  # Required for dind
+    DOCKER_CMD+=(--security-opt seccomp=unconfined)
+fi
 
 # Working directory
 DOCKER_CMD+=(-w "$WORKDIR")
@@ -305,10 +309,10 @@ for mount in "${MOUNTS[@]}"; do
     ((++MOUNT_INDEX))
 done
 
-# Mount Docker socket if enabled (skipped in dind mode)
-if [ "$DOCKER_SOCKET" = true ]; then
+# Mount Docker socket only in insecure mode
+if [ "$INSECURE_MODE" = true ]; then
     if [ -S /var/run/docker.sock ]; then
-        log_info "Mounting Docker socket"
+        log_info "Mounting host Docker socket"
         DOCKER_CMD+=(-v /var/run/docker.sock:/var/run/docker.sock)
         # Add user to docker group by matching host docker GID
         DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock 2>/dev/null)
@@ -316,8 +320,6 @@ if [ "$DOCKER_SOCKET" = true ]; then
     else
         log_warn "Docker socket not found at /var/run/docker.sock"
     fi
-elif [ "$DIND_MODE" = true ]; then
-    log_info "Skipping host Docker socket (using dind instead)"
 fi
 
 # Mount Claude credentials and configuration if enabled (using bindfs for permission handling)
@@ -399,9 +401,8 @@ fi
 # Set terminal type for proper rendering
 DOCKER_CMD+=(-e "TERM=${TERM:-xterm-256color}")
 
-# Enable Docker-in-Docker mode if requested
+# Enable Docker-in-Docker mode (default, unless --insecure)
 if [ "$DIND_MODE" = true ]; then
-    log_info "Enabling Docker-in-Docker mode (isolated Docker daemon)"
     DOCKER_CMD+=(-e "DIND_MODE=true")
 fi
 
