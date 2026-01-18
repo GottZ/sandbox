@@ -124,17 +124,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     rm -rf /var/lib/apt/lists/* && \
     npm install -g npm@latest
 
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
+# Install Go (system-wide)
+ARG GO_VERSION=1.23.4
+RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+ENV PATH="/usr/local/go/bin:$PATH"
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-ENV PATH="/root/.cargo/bin:$PATH"
-RUN rustup component add rustfmt clippy rust-analyzer
-
-# Install Zig
+# Install Zig (system-wide, no user context needed)
 RUN curl -LO https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz && \
     tar -xf zig-x86_64-linux-0.15.2.tar.xz && \
     mv zig-x86_64-linux-0.15.2 /opt/zig && \
@@ -147,23 +142,8 @@ RUN curl -LO https://github.com/zigtools/zls/releases/download/0.15.0/zls-x86_64
     mv zls /usr/local/bin/ && \
     rm zls-x86_64-linux.tar.xz
 
-# Install useful Rust tools
-RUN cargo install \
-    cargo-watch \
-    cargo-edit \
-    cargo-audit \
-    tokei \
-    hyperfine \
-    && rm -rf /root/.cargo/registry/cache
-
-# Claude Code will be installed as the claude user later (requires ~/.local/bin)
-
-# Install Playwright dependencies first (for all browsers)
+# Install Playwright dependencies (system libraries)
 RUN npx playwright install-deps
-
-# Install Playwright with all browsers
-RUN npm install -g playwright @playwright/test && \
-    npx playwright install chromium firefox webkit
 
 # Install additional browser runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -184,10 +164,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgbm1 \
     libasound2t64 \
     && rm -rf /var/lib/apt/lists/*
-
-# Set Playwright environment variables
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/claude/.cache/ms-playwright
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # Create non-root user for Claude (required for --dangerously-skip-permissions)
 # Remove existing UID 1000 user if present, then create claude user
@@ -213,13 +189,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/claude-wrapper
 WORKDIR /workspace
 RUN chown claude:claude /workspace
 
-# Copy rust/bun/zig/playwright to claude user
-RUN cp -r /root/.cargo /home/claude/.cargo && \
-    cp -r /root/.rustup /home/claude/.rustup && \
-    cp -r /root/.bun /home/claude/.bun && \
-    cp -r /root/.cache /home/claude/.cache && \
-    chown -R claude:claude /home/claude/.cargo /home/claude/.rustup /home/claude/.bun /home/claude/.cache
-
 # Configure git defaults for claude user
 RUN su - claude -c 'git config --global init.defaultBranch main && \
     git config --global core.editor vim && \
@@ -235,34 +204,71 @@ RUN echo 'alias ll="ls -la"' >> /home/claude/.bashrc && \
     echo 'alias grep="grep --color=auto"' >> /home/claude/.bashrc && \
     echo 'alias rg="rg --smart-case"' >> /home/claude/.bashrc
 
-# Update PATH and environment for claude user
-RUN echo 'export PATH="/home/claude/.local/bin:/home/claude/.cargo/bin:/home/claude/.bun/bin:/opt/zig:$PATH"' >> /home/claude/.bashrc && \
-    echo 'export RUSTUP_HOME=/home/claude/.rustup' >> /home/claude/.bashrc && \
-    echo 'export CARGO_HOME=/home/claude/.cargo' >> /home/claude/.bashrc && \
-    echo 'export PLAYWRIGHT_BROWSERS_PATH=/home/claude/.cache/ms-playwright' >> /home/claude/.bashrc && \
+# Update PATH and environment for claude user (set before switching user)
+# Standard bin directories per documentation:
+#   ~/.local/bin     - npm global packages (with prefix), pip --user
+#   ~/.cargo/bin     - Rust/cargo binaries
+#   ~/.bun/bin       - Bun binaries
+#   ~/go/bin         - Go packages installed via 'go install'
+#   /usr/local/go/bin - Go toolchain
+#   /opt/zig         - Zig toolchain
+RUN echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.bun/bin:/usr/local/go/bin:/opt/zig:$PATH"' >> /home/claude/.bashrc && \
+    echo 'export GOPATH="$HOME/go"' >> /home/claude/.bashrc && \
+    echo 'export RUSTUP_HOME="$HOME/.rustup"' >> /home/claude/.bashrc && \
+    echo 'export CARGO_HOME="$HOME/.cargo"' >> /home/claude/.bashrc && \
+    echo 'export BUN_INSTALL="$HOME/.bun"' >> /home/claude/.bashrc && \
+    echo 'export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"' >> /home/claude/.bashrc && \
     echo 'export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1' >> /home/claude/.bashrc
 
-# Switch to claude user
+# Switch to claude user for all user-local installations
 USER claude
 ENV HOME=/home/claude
-ENV PATH="/home/claude/.local/bin:/home/claude/.cargo/bin:/home/claude/.bun/bin:/opt/zig:$PATH"
+ENV GOPATH=/home/claude/go
+ENV PATH="/home/claude/.local/bin:/home/claude/go/bin:/home/claude/.cargo/bin:/home/claude/.bun/bin:/usr/local/go/bin:/opt/zig:$PATH"
 
-# Configure npm to install global packages to ~/.local and install Claude Code
-RUN mkdir -p ~/.local && \
-    npm config set prefix ~/.local && \
-    npm install -g @anthropic-ai/claude-code && \
-    ls -la ~/.local/bin/
+# Create Go workspace directory
+RUN mkdir -p ~/go/bin ~/go/src ~/go/pkg
+
+# Install Bun as claude user (directly into user context)
+RUN curl -fsSL https://bun.sh/install | bash
 ENV BUN_INSTALL="/home/claude/.bun"
+
+# Install Rust as claude user (directly into user context)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 ENV RUSTUP_HOME=/home/claude/.rustup
 ENV CARGO_HOME=/home/claude/.cargo
+ENV PATH="/home/claude/.cargo/bin:$PATH"
+RUN rustup component add rustfmt clippy rust-analyzer
+
+# Install useful Rust tools as claude user
+RUN cargo install \
+    cargo-watch \
+    cargo-edit \
+    cargo-audit \
+    tokei \
+    hyperfine \
+    && rm -rf ~/.cargo/registry/cache
+
+# Configure npm to install global packages to ~/.local
+RUN mkdir -p ~/.local && \
+    npm config set prefix ~/.local
+
+# Install Playwright as claude user and download browsers to user cache
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/claude/.cache/ms-playwright
+RUN npm install -g playwright @playwright/test && \
+    npx playwright install chromium firefox webkit
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+# Install Claude Code as claude user
+RUN npm install -g @anthropic-ai/claude-code && \
+    ls -la ~/.local/bin/
 
 # Verify installations
 RUN echo "=== Verifying installations ===" && \
     node --version && \
     npm --version && \
     bun --version && \
+    go version && \
     rustc --version && \
     cargo --version && \
     zig version && \

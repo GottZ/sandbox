@@ -8,13 +8,14 @@ Use this prompt with Claude Code to update all tool versions in the Dockerfile t
 Research the latest stable versions for all tools in the Dockerfile and update them:
 
 1. **Node.js** - Check nodejs.org for current LTS version
-2. **Zig** - Check ziglang.org/download for latest stable
-3. **zls** - Must match Zig version, check github.com/zigtools/zls/releases
-4. **ripgrep** - Check github.com/BurntSushi/ripgrep/releases
-5. **fd** - Check github.com/sharkdp/fd/releases
-6. **bat** - Check github.com/sharkdp/bat/releases
-7. **yq** - Using /latest redirect, verify it works
-8. **Bun** - Using install script, always gets latest
+2. **Go** - Check go.dev/dl for latest stable
+3. **Zig** - Check ziglang.org/download for latest stable
+4. **zls** - Must match Zig version, check github.com/zigtools/zls/releases
+5. **ripgrep** - Check github.com/BurntSushi/ripgrep/releases
+6. **fd** - Check github.com/sharkdp/fd/releases
+7. **bat** - Check github.com/sharkdp/bat/releases
+8. **yq** - Using /latest redirect, verify it works
+9. **Bun** - Using install script, always gets latest
 
 Update the Dockerfile with correct:
 - Version numbers in URLs
@@ -29,6 +30,7 @@ Also update README.md version references.
 | Tool | Check URL |
 |------|-----------|
 | Node.js LTS | https://nodejs.org/en/about/previous-releases |
+| Go | https://go.dev/dl/ |
 | Zig | https://ziglang.org/download/ |
 | zls | https://github.com/zigtools/zls/releases |
 | ripgrep | https://github.com/BurntSushi/ripgrep/releases |
@@ -66,6 +68,13 @@ curl -LO https://github.com/sharkdp/bat/releases/download/v0.26.0/bat_0.26.0_amd
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 ```
 
+### Go
+```dockerfile
+# URL pattern: goVERSION.linux-amd64.tar.gz
+ARG GO_VERSION=1.23.4
+curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+```
+
 ### Zig
 ```dockerfile
 # URL pattern includes version in both URL and extracted dir name
@@ -92,6 +101,7 @@ docker build --no-cache -t claude-sandbox .
 docker run --rm claude-sandbox bash -c '
 echo "=== Versions ==="
 node --version
+go version
 bun --version
 rustc --version
 zig version
@@ -109,6 +119,7 @@ yq --version
 |------|---------|
 | Ubuntu | 24.04 LTS |
 | Node.js | 24.x LTS (Krypton) |
+| Go | 1.23.4 |
 | Bun | ~1.3.x |
 | Rust | stable |
 | Zig | 0.15.2 |
