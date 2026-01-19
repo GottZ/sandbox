@@ -7,9 +7,9 @@ A comprehensive Docker-based development environment pre-configured with multipl
 ### Language Runtimes
 - **Node.js** (v24 LTS Krypton) + npm
 - **Bun** (latest ~1.3.x)
-- **Go** (1.23.x)
+- **Go** (1.25.x)
 - **Rust** (stable) + cargo, rustfmt, clippy, rust-analyzer
-- **Zig** (0.15.2) + zls 0.15.0 language server
+- **Zig** (0.15.2) + zls 0.15.1 language server
 - **Python 3** + pip, venv
 
 ### Network Diagnostics

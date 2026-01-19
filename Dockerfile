@@ -104,9 +104,9 @@ RUN curl -LO https://github.com/sharkdp/fd/releases/download/v10.3.0/fd_10.3.0_a
     rm fd_10.3.0_amd64.deb
 
 # Install bat (better cat)
-RUN curl -LO https://github.com/sharkdp/bat/releases/download/v0.26.0/bat_0.26.0_amd64.deb && \
-    dpkg -i bat_0.26.0_amd64.deb && \
-    rm bat_0.26.0_amd64.deb
+RUN curl -LO https://github.com/sharkdp/bat/releases/download/v0.26.1/bat_0.26.1_amd64.deb && \
+    dpkg -i bat_0.26.1_amd64.deb && \
+    rm bat_0.26.1_amd64.deb
 
 # Install Docker CLI and Docker daemon (for dind mode)
 RUN install -m 0755 -d /etc/apt/keyrings && \
@@ -125,7 +125,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     npm install -g npm@latest
 
 # Install Go (system-wide)
-ARG GO_VERSION=1.23.4
+ARG GO_VERSION=1.25.6
 RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ENV PATH="/usr/local/go/bin:$PATH"
 
@@ -137,7 +137,7 @@ RUN curl -LO https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz 
 ENV PATH="/opt/zig:$PATH"
 
 # Install zls (Zig Language Server)
-RUN curl -LO https://github.com/zigtools/zls/releases/download/0.15.0/zls-x86_64-linux.tar.xz && \
+RUN curl -LO https://github.com/zigtools/zls/releases/download/0.15.1/zls-x86_64-linux.tar.xz && \
     tar -xf zls-x86_64-linux.tar.xz && \
     mv zls /usr/local/bin/ && \
     rm zls-x86_64-linux.tar.xz

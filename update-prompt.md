@@ -59,7 +59,7 @@ curl -LO https://github.com/sharkdp/fd/releases/download/v10.3.0/fd_10.3.0_amd64
 ### bat
 ```dockerfile
 # URL pattern: /download/vVERSION/bat_VERSION_amd64.deb
-curl -LO https://github.com/sharkdp/bat/releases/download/v0.26.0/bat_0.26.0_amd64.deb
+curl -LO https://github.com/sharkdp/bat/releases/download/v0.26.1/bat_0.26.1_amd64.deb
 ```
 
 ### Node.js
@@ -71,7 +71,7 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 ### Go
 ```dockerfile
 # URL pattern: goVERSION.linux-amd64.tar.gz
-ARG GO_VERSION=1.23.4
+ARG GO_VERSION=1.25.6
 curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ```
 
@@ -86,7 +86,7 @@ mv zig-x86_64-linux-0.15.2 /opt/zig
 ### zls
 ```dockerfile
 # Must match Zig major.minor version
-curl -LO https://github.com/zigtools/zls/releases/download/0.15.0/zls-x86_64-linux.tar.xz
+curl -LO https://github.com/zigtools/zls/releases/download/0.15.1/zls-x86_64-linux.tar.xz
 ```
 
 ## Verification After Update
@@ -119,12 +119,12 @@ yq --version
 |------|---------|
 | Ubuntu | 24.04 LTS |
 | Node.js | 24.x LTS (Krypton) |
-| Go | 1.23.4 |
+| Go | 1.25.6 |
 | Bun | ~1.3.x |
 | Rust | stable |
 | Zig | 0.15.2 |
-| zls | 0.15.0 |
+| zls | 0.15.1 |
 | ripgrep | 15.1.0 |
 | fd | 10.3.0 |
-| bat | 0.26.0 |
+| bat | 0.26.1 |
 | yq | 4.50.x |
