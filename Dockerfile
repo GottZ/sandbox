@@ -259,8 +259,8 @@ RUN npm install -g playwright @playwright/test && \
     npx playwright install chromium firefox webkit
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Install Claude Code as claude user
-RUN npm install -g @anthropic-ai/claude-code && \
+# Install Claude Code as claude user (native installation)
+RUN curl -fsSL https://claude.ai/install.sh | bash && \
     ls -la ~/.local/bin/
 
 # Verify installations
@@ -278,6 +278,7 @@ RUN echo "=== Verifying installations ===" && \
     convert --version | head -1 && \
     psql --version && \
     npx playwright --version && \
+    claude --version && \
     echo "=== Verifying Playwright browsers ===" && \
     ls -la $PLAYWRIGHT_BROWSERS_PATH && \
     echo "=== All tools installed successfully ==="
