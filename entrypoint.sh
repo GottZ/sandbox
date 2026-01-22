@@ -144,6 +144,21 @@ done
 # Ensure Claude config exists (fallback)
 ensure_claude_config
 
+# Apply forwarded git configuration
+# These are passed as environment variables from the host
+if [ -n "$GIT_USER_NAME" ]; then
+    log_info "Setting git user.name: $GIT_USER_NAME"
+    git config --global user.name "$GIT_USER_NAME"
+fi
+if [ -n "$GIT_USER_EMAIL" ]; then
+    log_info "Setting git user.email: $GIT_USER_EMAIL"
+    git config --global user.email "$GIT_USER_EMAIL"
+fi
+if [ -n "$GIT_DEFAULT_BRANCH" ]; then
+    log_info "Setting git init.defaultBranch: $GIT_DEFAULT_BRANCH"
+    git config --global init.defaultBranch "$GIT_DEFAULT_BRANCH"
+fi
+
 # Start Docker daemon if DIND_MODE is enabled
 if [ "$DIND_MODE" = "true" ] || [ "$DIND_MODE" = "1" ]; then
     log_info "Starting Docker-in-Docker daemon..."

@@ -401,6 +401,25 @@ fi
 # Set terminal type for proper rendering
 DOCKER_CMD+=(-e "TERM=${TERM:-xterm-256color}")
 
+# Forward git configuration (user.name, user.email, init.defaultBranch)
+# Read specific settings via git commands to respect includes and conditional configs
+GIT_USER_NAME=$(git config --global --get user.name 2>/dev/null || true)
+GIT_USER_EMAIL=$(git config --global --get user.email 2>/dev/null || true)
+GIT_DEFAULT_BRANCH=$(git config --global --get init.defaultBranch 2>/dev/null || true)
+
+if [ -n "$GIT_USER_NAME" ]; then
+    log_info "Forwarding git user.name: $GIT_USER_NAME"
+    DOCKER_CMD+=(-e "GIT_USER_NAME=$GIT_USER_NAME")
+fi
+if [ -n "$GIT_USER_EMAIL" ]; then
+    log_info "Forwarding git user.email: $GIT_USER_EMAIL"
+    DOCKER_CMD+=(-e "GIT_USER_EMAIL=$GIT_USER_EMAIL")
+fi
+if [ -n "$GIT_DEFAULT_BRANCH" ]; then
+    log_info "Forwarding git init.defaultBranch: $GIT_DEFAULT_BRANCH"
+    DOCKER_CMD+=(-e "GIT_DEFAULT_BRANCH=$GIT_DEFAULT_BRANCH")
+fi
+
 # Enable Docker-in-Docker mode (default, unless --insecure)
 if [ "$DIND_MODE" = true ]; then
     DOCKER_CMD+=(-e "DIND_MODE=true")
