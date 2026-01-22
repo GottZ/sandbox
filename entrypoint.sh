@@ -92,6 +92,7 @@ if [ -n "$BINDFS_MOUNTS" ]; then
                 --perms=a+rwX \
                 --create-for-user=1000 \
                 --create-for-group=1000 \
+                -o nonempty \
                 "$SRC" "$DST"
         fi
 
@@ -132,6 +133,7 @@ while true; do
                 --perms=a+rwX \
                 --create-for-user=1000 \
                 --create-for-group=1000 \
+                -o nonempty \
                 "$SRC" "$DST"
         fi
 
