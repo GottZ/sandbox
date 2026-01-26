@@ -41,6 +41,26 @@ log_error() {
     echo -e "${RED}[entrypoint]${NC} $1"
 }
 
+# Redirect $HOME to /home/claude if it's not already
+# This ensures root's home (/root) uses claude's home directory
+if [ "$HOME" != "/home/claude" ] && [ -n "$HOME" ]; then
+    log_info "Redirecting $HOME -> /home/claude"
+    # Remove existing home directory (backup any content first if needed)
+    if [ -d "$HOME" ] && [ ! -L "$HOME" ]; then
+        # Move any existing content to /home/claude
+        if [ "$(ls -A "$HOME" 2>/dev/null)" ]; then
+            log_info "Moving existing $HOME content to /home/claude"
+            cp -a "$HOME"/. /home/claude/ 2>/dev/null || true
+        fi
+        rm -rf "$HOME"
+    elif [ -L "$HOME" ]; then
+        rm -f "$HOME"
+    fi
+    # Create symlink
+    ln -s /home/claude "$HOME"
+    log_success "$HOME is now a symlink to /home/claude"
+fi
+
 # Process bindfs mounts from environment variable
 # Format: BINDFS_MOUNTS="src1:dst1;src2:dst2;..."
 if [ -n "$BINDFS_MOUNTS" ]; then
