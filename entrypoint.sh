@@ -224,5 +224,5 @@ if [ "$DIND_MODE" = "true" ] || [ "$DIND_MODE" = "1" ]; then
 fi
 
 # Execute the command passed to the container as claude user
-# Use sudo to switch to claude user while preserving environment (-E)
-exec sudo -u claude -E -- "$@"
+# Use sudo with -E to preserve env vars, but explicitly set PATH (sudo filters it by default)
+exec sudo -u claude -E PATH="/home/claude/.local/bin:/home/claude/go/bin:/home/claude/.cargo/bin:/home/claude/.bun/bin:/usr/local/go/bin:/opt/zig:$PATH" -- "$@"
