@@ -398,6 +398,16 @@ if [ -n "$BINDFS_MOUNTS" ]; then
     DOCKER_CMD+=(-e "BINDFS_MOUNTS=$BINDFS_MOUNTS")
 fi
 
+# Mount /etc/DIR_COLORS if it exists (for ls color support)
+if [ -e "/etc/DIR_COLORS" ]; then
+    # Follow symlink if it is one
+    DIR_COLORS_PATH=$(readlink -f "/etc/DIR_COLORS" 2>/dev/null || echo "/etc/DIR_COLORS")
+    if [ -f "$DIR_COLORS_PATH" ]; then
+        log_info "Mounting DIR_COLORS: $DIR_COLORS_PATH"
+        DOCKER_CMD+=(-v "$DIR_COLORS_PATH:/etc/DIR_COLORS:ro")
+    fi
+fi
+
 # Set terminal type for proper rendering
 DOCKER_CMD+=(-e "TERM=${TERM:-xterm-256color}")
 
@@ -423,6 +433,13 @@ fi
 # Enable Docker-in-Docker mode (default, unless --insecure)
 if [ "$DIND_MODE" = true ]; then
     DOCKER_CMD+=(-e "DIND_MODE=true")
+fi
+
+# Pass host HOME to container if it differs from /home/claude and /root
+# This allows the entrypoint to create a symlink for compatibility (e.g., /Users/username on macOS)
+if [ "$HOME" != "/home/claude" ] && [ "$HOME" != "/root" ]; then
+    log_info "Passing host HOME path: $HOME"
+    DOCKER_CMD+=(-e "HOST_HOME=$HOME")
 fi
 
 # Add hostname

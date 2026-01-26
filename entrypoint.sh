@@ -41,24 +41,18 @@ log_error() {
     echo -e "${RED}[entrypoint]${NC} $1"
 }
 
-# Redirect $HOME to /home/claude if it's not already
-# This ensures root's home (/root) uses claude's home directory
-if [ "$HOME" != "/home/claude" ] && [ -n "$HOME" ]; then
-    log_info "Redirecting $HOME -> /home/claude"
-    # Remove existing home directory (backup any content first if needed)
-    if [ -d "$HOME" ] && [ ! -L "$HOME" ]; then
-        # Move any existing content to /home/claude
-        if [ "$(ls -A "$HOME" 2>/dev/null)" ]; then
-            log_info "Moving existing $HOME content to /home/claude"
-            cp -a "$HOME"/. /home/claude/ 2>/dev/null || true
-        fi
-        rm -rf "$HOME"
-    elif [ -L "$HOME" ]; then
-        rm -f "$HOME"
-    fi
+# Create symlink for host's $HOME if it differs from /home/claude and /root
+# HOST_HOME is passed from claude-sandbox.sh when host $HOME is something else (e.g., /Users/username on macOS)
+# /root is already a symlink to /home/claude (created in Dockerfile)
+if [ -n "$HOST_HOME" ] && [ "$HOST_HOME" != "/home/claude" ] && [ "$HOST_HOME" != "/root" ]; then
+    log_info "Creating symlink for host HOME: $HOST_HOME -> /home/claude"
+    # Create parent directories if needed
+    mkdir -p "$(dirname "$HOST_HOME")"
+    # Remove if exists (file or directory)
+    rm -rf "$HOST_HOME" 2>/dev/null || true
     # Create symlink
-    ln -s /home/claude "$HOME"
-    log_success "$HOME is now a symlink to /home/claude"
+    ln -s /home/claude "$HOST_HOME"
+    log_success "$HOST_HOME is now a symlink to /home/claude"
 fi
 
 # Process bindfs mounts from environment variable
@@ -229,5 +223,6 @@ if [ "$DIND_MODE" = "true" ] || [ "$DIND_MODE" = "1" ]; then
     sudo chmod 666 /var/run/docker.sock
 fi
 
-# Execute the command passed to the container
-exec "$@"
+# Execute the command passed to the container as claude user
+# Use sudo to switch to claude user while preserving environment (-E)
+exec sudo -u claude -E -- "$@"

@@ -283,6 +283,10 @@ RUN echo "=== Verifying installations ===" && \
     ls -la $PLAYWRIGHT_BROWSERS_PATH && \
     echo "=== All tools installed successfully ==="
 
+# Make /root a symlink to /home/claude (requires switching back to root)
+USER root
+RUN rm -rf /root && ln -s /home/claude /root
+
 # Set entrypoint for bindfs mount handling
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
