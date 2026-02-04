@@ -53,7 +53,8 @@ ${GREEN}Options:${NC}
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
                            SRC = host path, DST = container path
                            If DST is omitted, mounts to /workspace/\$(basename SRC)
-                           Default: current directory mounted to /workspace
+                           Default /workspace mount (current dir) is always added
+                           unless you explicitly specify a mount with DST=/workspace
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
   --insecure               Expose host Docker socket and PID namespace (less isolated)
@@ -200,9 +201,21 @@ if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
     log_success "Image built successfully"
 fi
 
-# Default to mounting current directory if no mounts specified
-if [ ${#MOUNTS[@]} -eq 0 ]; then
-    MOUNTS+=("$(pwd):/workspace")
+# Check if any mount explicitly targets /workspace
+HAS_WORKSPACE_MOUNT=false
+for mount in "${MOUNTS[@]}"; do
+    IFS=':' read -ra PARTS <<< "$mount"
+    DST="${PARTS[1]:-}"
+    if [ "$DST" = "/workspace" ]; then
+        HAS_WORKSPACE_MOUNT=true
+        break
+    fi
+done
+
+# Add default workspace mount unless explicitly overridden
+if [ "$HAS_WORKSPACE_MOUNT" = false ]; then
+    # Prepend default mount so user mounts are processed after
+    MOUNTS=("$(pwd):/workspace" "${MOUNTS[@]}")
 fi
 
 # Build docker run command
