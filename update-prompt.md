@@ -113,7 +113,7 @@ yq --version
 '
 ```
 
-## Current Versions (as of January 2026)
+## Current Versions (as of February 2026)
 
 | Tool | Version |
 |------|---------|
@@ -127,4 +127,4 @@ yq --version
 | ripgrep | 15.1.0 |
 | fd | 10.3.0 |
 | bat | 0.26.1 |
-| yq | 4.50.x |
+| yq | 4.52.x |
