@@ -218,7 +218,8 @@ RUN echo 'export PATH="$HOME/.local/bin:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.bun
     echo 'export CARGO_HOME="$HOME/.cargo"' >> /home/claude/.bashrc && \
     echo 'export BUN_INSTALL="$HOME/.bun"' >> /home/claude/.bashrc && \
     echo 'export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"' >> /home/claude/.bashrc && \
-    echo 'export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1' >> /home/claude/.bashrc
+    echo 'export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1' >> /home/claude/.bashrc && \
+    echo 'export PUPPETEER_CACHE_DIR="$HOME/.cache/puppeteer"' >> /home/claude/.bashrc
 
 # Switch to claude user for all user-local installations
 USER claude
@@ -258,6 +259,11 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/home/claude/.cache/ms-playwright
 RUN npm install -g playwright @playwright/test && \
     npx playwright install chromium firefox webkit
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+# Install Puppeteer via bun as claude user
+ENV PUPPETEER_CACHE_DIR=/home/claude/.cache/puppeteer
+RUN bun add -g puppeteer && \
+    bunx puppeteer browsers install chrome
 
 # Install Claude Code as claude user (native installation)
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
