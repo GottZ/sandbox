@@ -71,7 +71,7 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 ### Go
 ```dockerfile
 # URL pattern: goVERSION.linux-amd64.tar.gz
-ARG GO_VERSION=1.25.6
+ARG GO_VERSION=1.25.7
 curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ```
 
@@ -119,7 +119,7 @@ yq --version
 |------|---------|
 | Ubuntu | 24.04 LTS |
 | Node.js | 24.x LTS (Krypton) |
-| Go | 1.25.6 |
+| Go | 1.25.7 |
 | Bun | ~1.3.x |
 | Rust | stable |
 | Zig | 0.15.2 |

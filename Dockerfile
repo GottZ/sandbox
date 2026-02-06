@@ -125,7 +125,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     npm install -g npm@latest
 
 # Install Go (system-wide)
-ARG GO_VERSION=1.25.6
+ARG GO_VERSION=1.25.7
 RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ENV PATH="/usr/local/go/bin:$PATH"
 
