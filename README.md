@@ -88,6 +88,7 @@ claude "explain this codebase"
 Options:
   -w, --workdir PATH       Set working directory inside container (default: /workspace)
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
+                           If DST is omitted, mounts to the same path inside the container
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
   --insecure               Expose host Docker socket and PID namespace (less isolated)
