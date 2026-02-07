@@ -235,6 +235,27 @@ for mount in "${MOUNTS[@]}"; do
     fi
 done
 
+# Also check overlay mounts — resolve DST the same way the processing loop will
+if [ "$HAS_WORKSPACE_MOUNT" = false ]; then
+    for mount in "${OVERLAY_MOUNTS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$mount"
+        OV_SRC="${PARTS[0]}"
+        OV_DST="${PARTS[1]:-}"
+        OV_SRC=$(eval echo "$OV_SRC")
+        if [[ ! "$OV_SRC" = /* ]]; then
+            OV_SRC="$(cd "$OV_SRC" 2>/dev/null && pwd)" || true
+        fi
+        # Resolve implicit DST the same way the overlay loop does
+        if [ -z "$OV_DST" ] && [ "$OV_SRC" = "$(pwd)" ]; then
+            OV_DST="$WORKDIR"
+        fi
+        if [ "$OV_DST" = "/workspace" ]; then
+            HAS_WORKSPACE_MOUNT=true
+            break
+        fi
+    done
+fi
+
 # Add default workspace mount unless explicitly overridden
 if [ "$HAS_WORKSPACE_MOUNT" = false ]; then
     # Prepend default mount so user mounts are processed after
@@ -377,9 +398,13 @@ for mount in "${OVERLAY_MOUNTS[@]}"; do
         exit 1
     fi
 
-    # If no destination, mirror the source path inside the container
+    # If no destination: current directory maps to WORKDIR, everything else mirrors the path
     if [ -z "$DST" ]; then
-        DST="$SRC"
+        if [ "$SRC" = "$(pwd)" ]; then
+            DST="$WORKDIR"
+        else
+            DST="$SRC"
+        fi
     fi
 
     STAGE_PATH="/mnt/overlay/$OVERLAY_MOUNT_INDEX"
