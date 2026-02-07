@@ -41,6 +41,7 @@ INSECURE_MODE=false # When true: expose host Docker socket and PID namespace
 CLAUDE_CREDS=true
 EXTRA_ARGS=()
 INITIAL_PROMPT=""
+VERBOSE=false
 
 usage() {
     cat << EOF
@@ -60,6 +61,7 @@ ${GREEN}Options:${NC}
   --insecure               Expose host Docker socket and PID namespace (less isolated)
   --no-creds               Don't mount Claude credentials
   -n, --name NAME          Set container name (default: auto-generated)
+  -v, --verbose            Show the full docker command being executed
   -h, --help               Show this help message
 
 ${GREEN}Examples:${NC}
@@ -124,6 +126,15 @@ EOF
     exit 0
 }
 
+# Detect host IPs for routing inside container (excludes loopback, docker, and virtual interfaces)
+detect_host_ips() {
+    if command -v ip &> /dev/null; then
+        ip -4 addr show scope global | grep -v -E 'docker|br-|veth' | grep -oP 'inet \K[\d.]+' | paste -sd, -
+    elif command -v ifconfig &> /dev/null; then
+        ifconfig | grep 'inet ' | awk '{print $2}' | grep -v '^127\.' | paste -sd, -
+    fi
+}
+
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -171,6 +182,10 @@ while [[ $# -gt 0 ]]; do
         -n|--name)
             CONTAINER_NAME="$2"
             shift 2
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
             ;;
         -h|--help)
             usage
@@ -458,6 +473,16 @@ if [ "$HOME" != "/home/claude" ] && [ "$HOME" != "/root" ]; then
     DOCKER_CMD+=(-e "HOST_HOME=$HOME")
 fi
 
+# Always provide host.docker.internal for reaching the host
+DOCKER_CMD+=(--add-host=host.docker.internal:host-gateway)
+
+# Detect host IPs and pass to container for transparent routing
+HOST_IPS=$(detect_host_ips)
+if [ -n "$HOST_IPS" ]; then
+    log_info "Detected host IPs for routing: $HOST_IPS"
+    DOCKER_CMD+=(-e "HOST_IPS=$HOST_IPS")
+fi
+
 # Add hostname
 DOCKER_CMD+=(--hostname sandbox)
 
@@ -478,8 +503,11 @@ else
     DOCKER_CMD+=(claude-wrapper)
 fi
 
-# Print the command being run (for debugging)
+# Print the command being run
 log_info "Starting sandbox container..."
+if [ "$VERBOSE" = true ]; then
+    log_info "Docker command: ${DOCKER_CMD[*]}"
+fi
 
 # Run the container
 exec "${DOCKER_CMD[@]}"

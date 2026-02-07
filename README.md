@@ -93,6 +93,7 @@ Options:
   --insecure               Expose host Docker socket and PID namespace (less isolated)
   --no-creds               Don't mount Claude credentials
   -n, --name NAME          Set container name
+  -v, --verbose            Show the full docker command being executed
   -h, --help               Show help message
 ```
 
@@ -311,7 +312,7 @@ The first run builds the image which takes several minutes. Subsequent runs star
 
 3. **Credentials**: Claude credentials are mounted with bindfs for permission handling. The container can read and write to credential files.
 
-4. **Network**: The container has full network access. Use `--network none` to disable if needed.
+4. **Network**: The container has full network access. Use `--network none` to disable if needed. The sandbox automatically detects host IPs and sets up routing so containers can reach services on the host (e.g., MCP servers, local APIs). If your host runs a firewall, you may need to allow traffic from Docker bridge interfaces (`docker0`, `br-*`, `veth*`) to the relevant host ports.
 
 5. **Privileged Mode**: The container runs in privileged mode (required for dind). This grants elevated capabilities inside the container.
 

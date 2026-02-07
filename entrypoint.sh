@@ -188,6 +188,26 @@ while true; do
     ((i++))
 done
 
+# Set up iptables DNAT rules to redirect traffic destined for host's public IPs
+# through the Docker gateway. This allows the container to reach services running
+# on the host via their public/LAN IPs (e.g., MCP servers, local APIs).
+if [ -n "$HOST_IPS" ]; then
+    GATEWAY_IP=$(ip route | awk '/default/ {print $3}')
+    if [ -n "$GATEWAY_IP" ]; then
+        log_info "Setting up host IP routing (gateway: $GATEWAY_IP)"
+        IFS=',' read -ra IPS <<< "$HOST_IPS"
+        for host_ip in "${IPS[@]}"; do
+            if [ -n "$host_ip" ]; then
+                log_info "  Routing $host_ip -> $GATEWAY_IP"
+                sudo iptables -t nat -A OUTPUT -d "$host_ip" -j DNAT --to-destination "$GATEWAY_IP"
+            fi
+        done
+        log_success "Host IP routing configured"
+    else
+        log_warn "Could not determine container gateway IP, skipping host IP routing"
+    fi
+fi
+
 # Ensure Claude config exists (fallback)
 ensure_claude_config
 
