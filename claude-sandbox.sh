@@ -111,7 +111,7 @@ ${GREEN}Permissions:${NC}
     - All Linux capabilities added
     - Seccomp and AppArmor disabled
     - Host PID namespace access
-    - Claude Code runs with --permission-mode bypassPermissions (no prompts)
+    - Claude Code runs with --dangerously-skip-permissions (no prompts)
 
 ${GREEN}Mount Handling:${NC}
   Mounts are automatically checked for accessibility:

@@ -46,7 +46,8 @@ A comprehensive Docker-based development environment pre-configured with multipl
 ### 1. Build the Image
 
 ```bash
-docker build -t claude-sandbox .
+./build.sh
+# or: docker build -t claude-sandbox .
 ```
 
 Or let the script build it automatically on first run.
@@ -54,14 +55,17 @@ Or let the script build it automatically on first run.
 ### 2. Run the Sandbox
 
 ```bash
-# Run interactive shell with current directory mounted
-./claude-sandbox.sh -m .:/workspace
+# Run in current directory (auto-mounted to /workspace)
+./claude-sandbox.sh
 
 # Run with a specific project directory
 ./claude-sandbox.sh -m ~/my-project:/workspace
 
-# Mount multiple directories
-./claude-sandbox.sh -m ~/projects:/workspace -m ~/data:/data
+# Run with an initial prompt
+./claude-sandbox.sh -p "Review the codebase and suggest improvements"
+
+# Mount additional directories
+./claude-sandbox.sh -m ~/data:/data
 ```
 
 ### 3. Use Claude Code Inside the Container
@@ -84,6 +88,7 @@ claude "explain this codebase"
 Options:
   -w, --workdir PATH       Set working directory inside container (default: /workspace)
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
+  -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
   --insecure               Expose host Docker socket and PID namespace (less isolated)
   --no-creds               Don't mount Claude credentials
@@ -96,14 +101,14 @@ Options:
 ### Basic Usage
 
 ```bash
-# Interactive shell in current directory
-./claude-sandbox.sh -m .:/workspace
+# Interactive Claude Code in current directory
+./claude-sandbox.sh
 
 # Run a specific command
-./claude-sandbox.sh -m .:/workspace -- cargo build --release
+./claude-sandbox.sh -- cargo build --release
 
-# Start Claude Code directly
-./claude-sandbox.sh -m ~/project:/workspace -- claude
+# Start Claude Code directly with a prompt
+./claude-sandbox.sh -p "explain this codebase"
 ```
 
 ### Multiple Mounts
@@ -112,21 +117,20 @@ Options:
 # Mount project and shared data
 ./claude-sandbox.sh \
   -m ~/project:/workspace \
-  -m ~/shared-libs:/libs \
-  -m ~/.ssh:/root/.ssh:ro
+  -m ~/shared-libs:/libs
 ```
 
 ### Run Build Commands
 
 ```bash
 # Run npm install and build
-./claude-sandbox.sh -m .:/workspace -- bash -c "npm install && npm run build"
+./claude-sandbox.sh -- bash -c "npm install && npm run build"
 
 # Run Rust tests
-./claude-sandbox.sh -m .:/workspace -- cargo test
+./claude-sandbox.sh -- cargo test
 
 # Run Zig build
-./claude-sandbox.sh -m .:/workspace -- zig build
+./claude-sandbox.sh -- zig build
 ```
 
 ### Docker-in-Docker
@@ -134,7 +138,7 @@ Options:
 The sandbox runs an isolated Docker daemon by default:
 
 ```bash
-./claude-sandbox.sh -m .:/workspace
+./claude-sandbox.sh
 
 # Inside the container - containers run INSIDE the sandbox
 docker run -p 8080:80 nginx
@@ -148,7 +152,7 @@ This provides:
 
 **Insecure mode** - exposes host Docker socket:
 ```bash
-./claude-sandbox.sh --insecure -m .:/workspace
+./claude-sandbox.sh --insecure
 
 # Inside the container - containers run on HOST
 docker ps  # Shows host containers
@@ -159,13 +163,15 @@ Use `--insecure` only when you specifically need host Docker access.
 
 ## Claude Credentials
 
-The script automatically mounts Claude credentials from your home directory:
+The script automatically mounts Claude configuration from your home directory
+using bindfs to remap ownership to the container's `claude` user:
 
-| Host Path | Container Path | Mode |
-|-----------|----------------|------|
-| `~/.claude/` | `/root/.claude/` | read-only |
-| `~/.config/claude/` | `/root/.config/claude/` | read-only |
-| `~/.anthropic/` | `/root/.anthropic/` | read-only |
+| Host Path | Container Path | Notes |
+|-----------|----------------|-------|
+| `~/.claude/` | `/home/claude/.claude/` | Config (`.config.json`), credentials, agents, skills, commands, plugins |
+| `~/.claude.json` | `/home/claude/.claude.json` | Legacy config (fallback if `~/.claude/.config.json` doesn't exist) |
+| `~/.config/claude/` | `/home/claude/.config/claude/` | Additional config |
+| `~/.anthropic/` | `/home/claude/.anthropic/` | Alternative config location |
 
 If `ANTHROPIC_API_KEY` is set on the host, it's passed through to the container.
 
@@ -184,7 +190,7 @@ claude login
 ### Running Without Credentials
 
 ```bash
-./claude-sandbox.sh --no-creds -m .:/workspace
+./claude-sandbox.sh --no-creds
 ```
 
 ## Customization
@@ -216,7 +222,7 @@ docker volume create cargo-cache
 
 # Run with volume mounted
 docker run -it --rm \
-  -v cargo-cache:/root/.cargo/registry \
+  -v cargo-cache:/home/claude/.cargo/registry \
   -v $(pwd):/workspace \
   claude-sandbox
 ```
@@ -227,9 +233,8 @@ Mount your dotfiles:
 
 ```bash
 ./claude-sandbox.sh \
-  -m .:/workspace \
-  -m ~/.bashrc:/root/.bashrc:ro \
-  -m ~/.vimrc:/root/.vimrc:ro
+  -m ~/.bashrc:/home/claude/.bashrc:ro \
+  -m ~/.vimrc:/home/claude/.vimrc:ro
 ```
 
 ## Network Diagnostics Examples
