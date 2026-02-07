@@ -178,12 +178,7 @@ RUN apt-get update && apt-get install -y sudo bindfs && \
     rm -rf /var/lib/apt/lists/*
 
 # Create mount staging directories
-RUN mkdir -p /mnt/bindfs /mnt/workspace
-
-# Copy and set up entrypoint script and claude wrapper
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY claude-wrapper.sh /usr/local/bin/claude-wrapper
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/claude-wrapper
+RUN mkdir -p /mnt/bindfs /mnt/overlay /mnt/workspace
 
 # Set up working directory
 WORKDIR /workspace
@@ -293,7 +288,11 @@ RUN echo "=== Verifying installations ===" && \
 USER root
 RUN rm -rf /root && ln -s /home/claude /root
 
-# Set entrypoint for bindfs mount handling
+# Copy entrypoint and wrapper scripts last to preserve cache for installations above
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY claude-wrapper.sh /usr/local/bin/claude-wrapper
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/claude-wrapper
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Default command
