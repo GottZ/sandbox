@@ -172,8 +172,8 @@ RUN if getent passwd 1000 > /dev/null; then userdel -r $(getent passwd 1000 | cu
     mkdir -p /home/claude/.claude /home/claude/.config/claude /home/claude/.anthropic /home/claude/.local/bin && \
     chown -R claude:claude /home/claude
 
-# Give claude user passwordless sudo access for full control and install bindfs + expect
-RUN apt-get update && apt-get install -y sudo bindfs expect && \
+# Give claude user passwordless sudo access for full control and install bindfs
+RUN apt-get update && apt-get install -y sudo bindfs && \
     echo "claude ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
     rm -rf /var/lib/apt/lists/*
 

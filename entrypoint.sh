@@ -6,15 +6,46 @@
 
 set -e
 
-# Ensure Claude config exists (fallback if ~/.claude.json not mounted)
+# Ensure Claude config has bypassPermissionsModeAccepted and hasCompletedOnboarding.
+# The new ELF binary (Bun-compiled) checks two config paths in order:
+#   1. ~/.claude/.config.json  (new path, takes precedence if exists)
+#   2. ~/.claude.json           (legacy path)
+# We must patch whichever file the binary will actually read.
 ensure_claude_config() {
-    local config_file="/home/claude/.claude.json"
+    local claude_dir="/home/claude/.claude"
+    local new_config="${claude_dir}/.config.json"
+    local legacy_config="/home/claude/.claude.json"
+    local required_fields='{"hasCompletedOnboarding":true,"numStartups":1,"bypassPermissionsModeAccepted":true}'
 
-    # Only create if it doesn't exist (prefer mounted config from host)
+    # Determine which config file the binary will use
+    local config_file="$legacy_config"
+    if [ -f "$new_config" ]; then
+        config_file="$new_config"
+    fi
+
     if [ ! -f "$config_file" ]; then
-        log_warn "No ~/.claude.json mounted, creating minimal config"
-        echo '{"hasCompletedOnboarding":true,"numStartups":1}' > "$config_file"
+        # No config exists — create minimal config at legacy path
+        log_warn "No config found, creating minimal config at $config_file"
+        mkdir -p "$(dirname "$config_file")"
+        echo "$required_fields" > "$config_file"
         chown claude:claude "$config_file" 2>/dev/null || true
+    else
+        # Config exists — ensure bypass and onboarding fields are set
+        if command -v jq > /dev/null 2>&1; then
+            local needs_update=false
+            if [ "$(jq -r '.bypassPermissionsModeAccepted // false' "$config_file" 2>/dev/null)" != "true" ]; then
+                needs_update=true
+            fi
+            if [ "$(jq -r '.hasCompletedOnboarding // false' "$config_file" 2>/dev/null)" != "true" ]; then
+                needs_update=true
+            fi
+            if [ "$needs_update" = "true" ]; then
+                log_info "Setting bypassPermissionsModeAccepted + hasCompletedOnboarding in $config_file"
+                local tmp_file="${config_file}.tmp"
+                jq '. + {"bypassPermissionsModeAccepted": true, "hasCompletedOnboarding": true}' "$config_file" > "$tmp_file" && mv "$tmp_file" "$config_file"
+                chown claude:claude "$config_file" 2>/dev/null || true
+            fi
+        fi
     fi
 }
 

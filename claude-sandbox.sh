@@ -339,9 +339,11 @@ fi
 if [ "$CLAUDE_CREDS" = true ]; then
     CREDS_MOUNTED=false
 
-    # Check for ~/.claude.json (main config with onboarding state)
+    # Mount legacy ~/.claude.json if it exists (binary checks this as fallback)
+    # Note: The new binary (v2.1.34+) prefers ~/.claude/.config.json which is
+    # included automatically when ~/.claude/ is mounted below.
     if [ -f "$HOME/.claude.json" ]; then
-        log_info "Mounting Claude config: ~/.claude.json (via bindfs)"
+        log_info "Mounting Claude config: ~/.claude.json (legacy, via bindfs)"
         STAGE_PATH="/mnt/bindfs/claude-json"
         DOCKER_CMD+=(-v "$HOME/.claude.json:$STAGE_PATH")
         if [ -n "$BINDFS_MOUNTS" ]; then
@@ -351,7 +353,8 @@ if [ "$CLAUDE_CREDS" = true ]; then
         CREDS_MOUNTED=true
     fi
 
-    # Check for ~/.claude directory (includes credentials, agents, skills, commands, plugins)
+    # Check for ~/.claude directory (includes credentials, config, agents, skills, commands, plugins)
+    # This also includes ~/.claude/.config.json (new config path since v2.1.34+)
     if [ -d "$HOME/.claude" ]; then
         log_info "Mounting Claude directory: ~/.claude (via bindfs for permissions)"
         STAGE_PATH="/mnt/bindfs/claude-home"
@@ -468,7 +471,7 @@ if [ ${#EXTRA_ARGS[@]} -gt 0 ]; then
 elif [ -n "$INITIAL_PROMPT" ]; then
     # Run claude with the provided prompt and all permissions skipped
     log_info "Running Claude Code with initial prompt (all permissions skipped)"
-    DOCKER_CMD+=(claude --allow-dangerously-skip-permissions --permission-mode bypassPermissions -p "$INITIAL_PROMPT")
+    DOCKER_CMD+=(claude --dangerously-skip-permissions -p "$INITIAL_PROMPT")
 else
     # Run claude interactively with all permissions skipped (using wrapper to auto-confirm)
     log_info "Running Claude Code interactively (all permissions skipped)"
