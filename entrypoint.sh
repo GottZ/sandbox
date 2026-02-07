@@ -188,6 +188,56 @@ while true; do
     ((i++))
 done
 
+# Process overlay mounts from environment variable
+# Format: OVERLAY_MOUNTS="stage1:dst1;stage2:dst2;..."
+# Each stage path is a read-only mount; overlayfs adds an ephemeral write layer on top
+if [ -n "$OVERLAY_MOUNTS" ]; then
+    log_info "Processing overlay mounts (ephemeral writes)..."
+
+    OVERLAY_INDEX=0
+    IFS=';' read -ra OVERLAY_PAIRS <<< "$OVERLAY_MOUNTS"
+    for pair in "${OVERLAY_PAIRS[@]}"; do
+        if [ -z "$pair" ]; then
+            continue
+        fi
+
+        IFS=':' read -ra PARTS <<< "$pair"
+        LOWER="${PARTS[0]}"
+        DST="${PARTS[1]}"
+
+        if [ -z "$LOWER" ] || [ -z "$DST" ]; then
+            log_warn "Invalid overlay mount pair: $pair"
+            continue
+        fi
+
+        if [ ! -d "$LOWER" ]; then
+            log_warn "Overlay lower dir does not exist: $LOWER"
+            continue
+        fi
+
+        # Create tmpfs-backed upper and work directories
+        UPPER="/tmp/overlay/$OVERLAY_INDEX/upper"
+        WORK="/tmp/overlay/$OVERLAY_INDEX/work"
+        sudo mkdir -p "$UPPER" "$WORK"
+
+        # Create destination directory
+        sudo mkdir -p "$DST"
+
+        # Mount overlayfs: lowerdir is the read-only host content,
+        # upperdir captures all writes (ephemeral, lives on tmpfs)
+        log_info "Overlay mounting $LOWER -> $DST (writes are ephemeral)"
+        sudo mount -t overlay overlay \
+            -o "lowerdir=$LOWER,upperdir=$UPPER,workdir=$WORK" \
+            "$DST"
+
+        # Ensure claude user can write to the upper layer
+        sudo chown claude:claude "$UPPER"
+
+        log_success "Overlay mounted: $DST (ephemeral writes enabled)"
+        ((OVERLAY_INDEX++))
+    done
+fi
+
 # Set up iptables DNAT rules to redirect traffic destined for host's public IPs
 # through the Docker gateway. This allows the container to reach services running
 # on the host via their public/LAN IPs (e.g., MCP servers, local APIs).

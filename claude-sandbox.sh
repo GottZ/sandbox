@@ -36,6 +36,7 @@ NC=$'\033[0m' # No Color
 WORKDIR="/workspace"
 INTERACTIVE=true
 MOUNTS=()
+OVERLAY_MOUNTS=()
 DIND_MODE=true      # Default: isolated Docker daemon
 INSECURE_MODE=false # When true: expose host Docker socket and PID namespace
 CLAUDE_CREDS=true
@@ -56,6 +57,9 @@ ${GREEN}Options:${NC}
                            If DST is omitted, mounts to the same path inside the container
                            Default /workspace mount (current dir) is always added
                            unless you explicitly specify a mount with DST=/workspace
+  -M, --overlay SRC:DST    Mount a host directory read-only with ephemeral writes (overlayfs)
+                           Writes inside the container are temporary and never persist to host
+                           If DST is omitted, mounts to the same path inside the container
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
   --insecure               Expose host Docker socket and PID namespace (less isolated)
@@ -160,6 +164,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -m|--mount)
             MOUNTS+=("$2")
+            shift 2
+            ;;
+        -M|--overlay)
+            OVERLAY_MOUNTS+=("$2")
             shift 2
             ;;
         -p|--prompt)
@@ -336,6 +344,62 @@ for mount in "${MOUNTS[@]}"; do
 
     ((++MOUNT_INDEX))
 done
+
+# Process overlay mounts (-M flag): host dir mounted read-only with ephemeral writes via overlayfs
+OVERLAY_MOUNT_INDEX=0
+OVERLAY_MOUNTS_ENV=""
+
+for mount in "${OVERLAY_MOUNTS[@]}"; do
+    IFS=':' read -ra PARTS <<< "$mount"
+    SRC="${PARTS[0]}"
+    DST="${PARTS[1]:-}"
+
+    # Expand paths
+    SRC=$(eval echo "$SRC")
+
+    # Convert to absolute path if relative
+    if [[ ! "$SRC" = /* ]]; then
+        SRC="$(cd "$SRC" 2>/dev/null && pwd)" || {
+            log_error "Overlay source path does not exist: $SRC"
+            exit 1
+        }
+    fi
+
+    # Check if source exists
+    if [ ! -e "$SRC" ]; then
+        log_error "Overlay source path does not exist: $SRC"
+        exit 1
+    fi
+
+    # Check if source is readable
+    if [ ! -r "$SRC" ]; then
+        log_error "Overlay source path is not readable: $SRC"
+        exit 1
+    fi
+
+    # If no destination, mirror the source path inside the container
+    if [ -z "$DST" ]; then
+        DST="$SRC"
+    fi
+
+    STAGE_PATH="/mnt/overlay/$OVERLAY_MOUNT_INDEX"
+
+    log_info "Mounting (overlay, ephemeral writes): $SRC -> $DST"
+    DOCKER_CMD+=(-v "$SRC:$STAGE_PATH:ro")
+
+    if [ -n "$OVERLAY_MOUNTS_ENV" ]; then
+        OVERLAY_MOUNTS_ENV="${OVERLAY_MOUNTS_ENV};"
+    fi
+    OVERLAY_MOUNTS_ENV="${OVERLAY_MOUNTS_ENV}${STAGE_PATH}:${DST}"
+
+    ((++OVERLAY_MOUNT_INDEX))
+done
+
+# Pass overlay mount configuration to entrypoint
+if [ -n "$OVERLAY_MOUNTS_ENV" ]; then
+    log_info "Overlay mounts configured for ephemeral writes"
+    DOCKER_CMD+=(-e "OVERLAY_MOUNTS=$OVERLAY_MOUNTS_ENV")
+fi
 
 # Mount Docker socket only in insecure mode
 if [ "$INSECURE_MODE" = true ]; then

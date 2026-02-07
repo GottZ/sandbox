@@ -89,6 +89,8 @@ Options:
   -w, --workdir PATH       Set working directory inside container (default: /workspace)
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
                            If DST is omitted, mounts to the same path inside the container
+  -M, --overlay SRC:DST    Mount read-only with ephemeral writes (overlayfs)
+                           Writes are temporary and never persist to host
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
   -d, --detach             Run container in background
   --insecure               Expose host Docker socket and PID namespace (less isolated)
@@ -120,6 +122,16 @@ Options:
 ./claude-sandbox.sh \
   -m ~/project:/workspace \
   -m ~/shared-libs:/libs
+```
+
+### Read-Only Overlay Mounts (Ephemeral Writes)
+
+```bash
+# Mount a directory read-only with temporary writes (lost when container stops)
+./claude-sandbox.sh -M ~/sensitive-project:/workspace
+
+# Combine regular and overlay mounts
+./claude-sandbox.sh -m ~/data:/data -M ~/config:/config
 ```
 
 ### Run Build Commands
