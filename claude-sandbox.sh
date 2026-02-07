@@ -53,7 +53,7 @@ ${GREEN}Options:${NC}
   -w, --workdir PATH       Set working directory inside container (default: /workspace)
   -m, --mount SRC:DST      Mount a host directory (can be used multiple times)
                            SRC = host path, DST = container path
-                           If DST is omitted, mounts to /workspace/\$(basename SRC)
+                           If DST is omitted, mounts to the same path inside the container
                            Default /workspace mount (current dir) is always added
                            unless you explicitly specify a mount with DST=/workspace
   -p, --prompt PROMPT      Initial prompt to pass to Claude Code
@@ -298,9 +298,9 @@ for mount in "${MOUNTS[@]}"; do
         exit 1
     fi
 
-    # If no destination, use /workspace/basename
+    # If no destination, mirror the source path inside the container
     if [ -z "$DST" ]; then
-        DST="/workspace/$(basename "$SRC")"
+        DST="$SRC"
     fi
 
     # Create staging path for bindfs
