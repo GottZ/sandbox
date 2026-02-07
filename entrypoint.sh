@@ -194,6 +194,12 @@ done
 if [ -n "$OVERLAY_MOUNTS" ]; then
     log_info "Processing overlay mounts (ephemeral writes)..."
 
+    # Mount tmpfs for overlay upper/work dirs — the container root fs is
+    # overlayfs (Docker overlay2) and overlayfs upper/work dirs cannot
+    # reside on an overlay filesystem.
+    sudo mkdir -p /tmp/overlay
+    sudo mount -t tmpfs tmpfs /tmp/overlay
+
     OVERLAY_INDEX=0
     IFS=';' read -ra OVERLAY_PAIRS <<< "$OVERLAY_MOUNTS"
     for pair in "${OVERLAY_PAIRS[@]}"; do
@@ -215,26 +221,38 @@ if [ -n "$OVERLAY_MOUNTS" ]; then
             continue
         fi
 
-        # Create tmpfs-backed upper and work directories
+        # Bindfs remap: the host files are root-owned. Remap to claude so
+        # overlayfs copy-up preserves claude ownership on modified files.
+        LOWER_MAPPED="/tmp/overlay/$OVERLAY_INDEX/lower"
         UPPER="/tmp/overlay/$OVERLAY_INDEX/upper"
         WORK="/tmp/overlay/$OVERLAY_INDEX/work"
-        sudo mkdir -p "$UPPER" "$WORK"
+        sudo mkdir -p "$LOWER_MAPPED" "$UPPER" "$WORK"
+
+        log_info "Bindfs remapping $LOWER -> $LOWER_MAPPED (claude:claude)"
+        sudo bindfs \
+            --force-user=claude \
+            --force-group=claude \
+            --perms=a+rwX \
+            --create-for-user=1000 \
+            --create-for-group=1000 \
+            -o nonempty \
+            "$LOWER" "$LOWER_MAPPED"
 
         # Create destination directory
         sudo mkdir -p "$DST"
 
-        # Mount overlayfs: lowerdir is the read-only host content,
+        # Mount overlayfs: lowerdir is the bindfs-remapped host content,
         # upperdir captures all writes (ephemeral, lives on tmpfs)
-        log_info "Overlay mounting $LOWER -> $DST (writes are ephemeral)"
+        log_info "Overlay mounting $LOWER_MAPPED -> $DST (writes are ephemeral)"
         sudo mount -t overlay overlay \
-            -o "lowerdir=$LOWER,upperdir=$UPPER,workdir=$WORK" \
+            -o "lowerdir=$LOWER_MAPPED,upperdir=$UPPER,workdir=$WORK" \
             "$DST"
 
-        # Ensure claude user can write to the upper layer
-        sudo chown claude:claude "$UPPER"
+        # Ensure the overlay root dir is owned by claude
+        sudo chown claude:claude "$DST"
 
         log_success "Overlay mounted: $DST (ephemeral writes enabled)"
-        ((OVERLAY_INDEX++))
+        OVERLAY_INDEX=$((OVERLAY_INDEX + 1))
     done
 fi
 
@@ -323,6 +341,11 @@ if [ "$DIND_MODE" = "true" ] || [ "$DIND_MODE" = "1" ]; then
     sudo usermod -aG docker claude 2>/dev/null || true
     sudo chmod 666 /var/run/docker.sock
 fi
+
+# Re-open CWD through current mount namespace — if an overlay was mounted on
+# the working directory, the old file descriptor still points to the pre-mount
+# directory. cd "$(pwd)" resolves the path fresh through any new mounts.
+cd "$(pwd)" 2>/dev/null || true
 
 # Execute the command passed to the container as claude user
 # Use sudo with -E to preserve env vars, but explicitly set PATH (sudo filters it by default)
