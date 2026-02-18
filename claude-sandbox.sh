@@ -95,6 +95,8 @@ ${GREEN}Claude Configuration:${NC}
     - Custom skills (~/.claude/skills/)
     - Custom commands (~/.claude/commands/)
     - MCP plugins (~/.claude/plugins/)
+    - Secrets (~/.secrets/) for Context Store auth etc.
+    - ctx CLI (/usr/local/bin/ctx) if installed
 
   Note: Container runs as non-root 'claude' user with passwordless sudo.
 
@@ -498,6 +500,24 @@ if [ "$CLAUDE_CREDS" = true ]; then
         fi
         BINDFS_MOUNTS="${BINDFS_MOUNTS}${STAGE_PATH}:/home/claude/.anthropic"
         CREDS_MOUNTED=true
+    fi
+
+    # Mount secrets needed for Claude workflow (e.g., Context Store auth key)
+    if [ -d "$HOME/.secrets" ]; then
+        log_info "Mounting secrets: ~/.secrets (via bindfs)"
+        STAGE_PATH="/mnt/bindfs/secrets"
+        DOCKER_CMD+=(-v "$HOME/.secrets:$STAGE_PATH")
+        if [ -n "$BINDFS_MOUNTS" ]; then
+            BINDFS_MOUNTS="${BINDFS_MOUNTS};"
+        fi
+        BINDFS_MOUNTS="${BINDFS_MOUNTS}${STAGE_PATH}:/home/claude/.secrets"
+        CREDS_MOUNTED=true
+    fi
+
+    # Mount ctx CLI if installed (Context Store CLI used by CLAUDE.md workflow)
+    if [ -f "/usr/local/bin/ctx" ]; then
+        log_info "Mounting ctx CLI: /usr/local/bin/ctx"
+        DOCKER_CMD+=(-v "/usr/local/bin/ctx:/usr/local/bin/ctx:ro")
     fi
 
     # Pass through API key environment variables if set

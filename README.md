@@ -186,6 +186,8 @@ using bindfs to remap ownership to the container's `claude` user:
 | `~/.claude.json` | `/home/claude/.claude.json` | Legacy config (fallback if `~/.claude/.config.json` doesn't exist) |
 | `~/.config/claude/` | `/home/claude/.config/claude/` | Additional config |
 | `~/.anthropic/` | `/home/claude/.anthropic/` | Alternative config location |
+| `~/.secrets/` | `/home/claude/.secrets/` | Auth keys (e.g., Context Store `n8n-ctx`) |
+| `/usr/local/bin/ctx` | `/usr/local/bin/ctx` | Context Store CLI (read-only) |
 
 If `ANTHROPIC_API_KEY` is set on the host, it's passed through to the container.
 
